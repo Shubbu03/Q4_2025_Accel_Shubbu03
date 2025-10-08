@@ -280,3 +280,144 @@ describe("whitelist-transfer-hook (PDA-based whitelist)", () => {
         }
     });
 });
+
+describe("whitelist-transfer-hook (using init_token_factory)", () => {
+    const provider = anchor.AnchorProvider.env();
+    anchor.setProvider(provider);
+
+    const wallet = provider.wallet as anchor.Wallet;
+    const program = anchor.workspace.whitelistTransferHook as Program<WhitelistTransferHook>;
+
+    const mint = anchor.web3.Keypair.generate();
+
+    const pdaForExtraAccountMetaList = (mint: PublicKey) =>
+        PublicKey.findProgramAddressSync(
+            [Buffer.from("extra-account-metas"), mint.toBuffer()],
+            program.programId
+        )[0];
+
+    const pdaForWhitelistEntry = (mint: PublicKey, user: PublicKey) =>
+        PublicKey.findProgramAddressSync(
+            [Buffer.from("whitelist"), mint.toBuffer(), user.toBuffer()],
+            program.programId
+        )[0];
+
+    const sourceTokenAccount = getAssociatedTokenAddressSync(
+        mint.publicKey,
+        wallet.publicKey,
+        false,
+        TOKEN_2022_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+
+    const recipient = anchor.web3.Keypair.generate();
+    const destinationTokenAccount = getAssociatedTokenAddressSync(
+        mint.publicKey,
+        recipient.publicKey,
+        false,
+        TOKEN_2022_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+
+    it("Creates mint using init_token_factory instruction", async () => {
+        const sig = await program.methods
+            .initTokenFactory()
+            .accountsPartial({
+                user: wallet.publicKey,
+                mint: mint.publicKey,
+                systemProgram: SystemProgram.programId,
+                tokenProgram: TOKEN_2022_PROGRAM_ID,
+            })
+            .signers([mint])
+            .rpc({ skipPreflight: true, commitment: "confirmed" });
+
+        console.log("Mint created via init_token_factory:", sig);
+        console.log("Mint address:", mint.publicKey.toBase58());
+    });
+
+    it("Initializes ExtraAccountMetaList for the new mint", async () => {
+        const extraAccountMetaListPDA = pdaForExtraAccountMetaList(mint.publicKey);
+
+        const sig = await program.methods
+            .initializeTransferHook()
+            .accountsPartial({
+                payer: wallet.publicKey,
+                mint: mint.publicKey,
+                extraAccountMetaList: extraAccountMetaListPDA,
+                systemProgram: SystemProgram.programId,
+            })
+            .rpc({ skipPreflight: true, commitment: "confirmed" });
+
+        console.log("ExtraAccountMetaList initialized:", sig);
+    });
+
+    it("Creates ATAs and mints tokens", async () => {
+        const amount = 100n * 10n ** 9n;
+
+        const tx = new Transaction().add(
+            createAssociatedTokenAccountInstruction(
+                wallet.publicKey,
+                sourceTokenAccount,
+                wallet.publicKey,
+                mint.publicKey,
+                TOKEN_2022_PROGRAM_ID,
+                ASSOCIATED_TOKEN_PROGRAM_ID
+            ),
+            createAssociatedTokenAccountInstruction(
+                wallet.publicKey,
+                destinationTokenAccount,
+                recipient.publicKey,
+                mint.publicKey,
+                TOKEN_2022_PROGRAM_ID,
+                ASSOCIATED_TOKEN_PROGRAM_ID
+            ),
+            createMintToInstruction(
+                mint.publicKey,
+                sourceTokenAccount,
+                wallet.publicKey,
+                Number(amount),
+                [],
+                TOKEN_2022_PROGRAM_ID
+            )
+        );
+
+        const sig = await sendAndConfirmTransaction(provider.connection, tx, [wallet.payer], {
+            skipPreflight: true,
+        });
+        console.log("ATAs created and tokens minted:", sig);
+    });
+
+    it("Adds wallet to whitelist and transfers successfully", async () => {
+        const whitelistPDA = pdaForWhitelistEntry(mint.publicKey, wallet.publicKey);
+
+        await program.methods
+            .addToWhitelist(wallet.publicKey)
+            .accountsPartial({
+                admin: wallet.publicKey,
+                mint: mint.publicKey,
+                whitelistEntry: whitelistPDA,
+                systemProgram: SystemProgram.programId,
+            })
+            .rpc({ skipPreflight: true });
+
+        const amount = 1n * 10n ** 9n;
+        const transferIx = await createTransferCheckedWithTransferHookInstruction(
+            provider.connection,
+            sourceTokenAccount,
+            mint.publicKey,
+            destinationTokenAccount,
+            wallet.publicKey,
+            amount,
+            9,
+            [],
+            "confirmed",
+            TOKEN_2022_PROGRAM_ID
+        );
+
+        const tx = new Transaction().add(transferIx);
+        const sig = await sendAndConfirmTransaction(provider.connection, tx, [wallet.payer], {
+            skipPreflight: false,
+        });
+        console.log("Transfer succeeded with whitelist:", sig);
+    });
+});
