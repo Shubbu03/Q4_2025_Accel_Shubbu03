@@ -72,103 +72,214 @@ mod tests {
         (program, payer)
     }
 
+    struct EscrowTestContext {
+        program: LiteSVM,
+        payer: Keypair,
+        maker: Pubkey,
+        mint_a: Pubkey,
+        mint_b: Pubkey,
+        maker_ata_a: Pubkey,
+        escrow: Pubkey,
+        vault: Pubkey,
+        seed: u64,
+    }
+
+    impl EscrowTestContext {
+        fn new() -> Self {
+            let (mut program, payer) = setup();
+            let maker = payer.pubkey();
+            let seed = 123u64;
+
+            // Create mints
+            let mint_a = CreateMint::new(&mut program, &payer)
+                .decimals(6)
+                .authority(&maker)
+                .send()
+                .unwrap();
+            msg!("Mint A: {}\n", mint_a);
+
+            let mint_b = CreateMint::new(&mut program, &payer)
+                .decimals(6)
+                .authority(&maker)
+                .send()
+                .unwrap();
+            msg!("Mint B: {}\n", mint_b);
+
+            // Create maker's ATA
+            let maker_ata_a = CreateAssociatedTokenAccount::new(&mut program, &payer, &mint_a)
+                .owner(&maker)
+                .send()
+                .unwrap();
+            msg!("Maker ATA A: {}\n", maker_ata_a);
+
+            // Derive PDAs
+            let escrow = Pubkey::find_program_address(
+                &[b"escrow", maker.as_ref(), &seed.to_le_bytes()],
+                &PROGRAM_ID,
+            )
+            .0;
+            msg!("Escrow PDA: {}\n", escrow);
+
+            let vault = associated_token::get_associated_token_address(&escrow, &mint_a);
+            msg!("Vault PDA: {}\n", vault);
+
+            // Mint initial tokens to maker
+            MintTo::new(&mut program, &payer, &mint_a, &maker_ata_a, 1_000_000_000)
+                .send()
+                .unwrap();
+
+            Self {
+                program,
+                payer,
+                maker,
+                mint_a,
+                mint_b,
+                maker_ata_a,
+                escrow,
+                vault,
+                seed,
+            }
+        }
+
+        fn execute_make(&mut self, deposit: u64, receive: u64, min_accept_lockin_time: i64) {
+            let make_ix = Instruction {
+                program_id: PROGRAM_ID,
+                accounts: crate::accounts::Make {
+                    maker: self.maker,
+                    mint_a: self.mint_a,
+                    mint_b: self.mint_b,
+                    maker_ata_a: self.maker_ata_a,
+                    escrow: self.escrow,
+                    vault: self.vault,
+                    associated_token_program: spl_associated_token_account::ID,
+                    token_program: TOKEN_PROGRAM_ID,
+                    system_program: SYSTEM_PROGRAM_ID,
+                }
+                .to_account_metas(None),
+                data: crate::instruction::Make {
+                    deposit,
+                    seed: self.seed,
+                    receive,
+                    min_accept_lockin_time,
+                }
+                .data(),
+            };
+
+            let message = Message::new(&[make_ix], Some(&self.payer.pubkey()));
+            let transaction =
+                Transaction::new(&[&self.payer], message, self.program.latest_blockhash());
+            self.program.send_transaction(transaction).unwrap();
+            msg!("Make transaction successful\n");
+        }
+
+        fn execute_refund(&mut self) {
+            let refund_ix = Instruction {
+                program_id: PROGRAM_ID,
+                accounts: crate::accounts::Refund {
+                    maker: self.maker,
+                    mint_a: self.mint_a,
+                    maker_ata_a: self.maker_ata_a,
+                    escrow: self.escrow,
+                    vault: self.vault,
+                    token_program: TOKEN_PROGRAM_ID,
+                    system_program: SYSTEM_PROGRAM_ID,
+                }
+                .to_account_metas(None),
+                data: crate::instruction::Refund {}.data(),
+            };
+
+            let message = Message::new(&[refund_ix], Some(&self.payer.pubkey()));
+            let transaction =
+                Transaction::new(&[&self.payer], message, self.program.latest_blockhash());
+            let tx = self.program.send_transaction(transaction).unwrap();
+            msg!("\n\nRefund transaction successful");
+            msg!("CUs Consumed: {}", tx.compute_units_consumed);
+            msg!("Tx Signature: {}", tx.signature);
+        }
+
+        fn get_token_balance(&mut self, ata: &Pubkey) -> u64 {
+            let account = self.program.get_account(ata).unwrap();
+            let token_account = spl_token::state::Account::unpack(&account.data).unwrap();
+            token_account.amount
+        }
+
+        fn assert_account_closed(&mut self, pubkey: &Pubkey, name: &str) {
+            if let Some(account) = self.program.get_account(pubkey) {
+                assert_eq!(
+                    account.lamports, 0,
+                    "{} should have 0 lamports after closure",
+                    name
+                );
+            }
+        }
+
+        fn execute_take(
+            &mut self,
+            taker: &Keypair,
+            taker_ata_a: Pubkey,
+            taker_ata_b: Pubkey,
+            maker_ata_b: Pubkey,
+        ) -> Result<(), String> {
+            let take_ix = Instruction {
+                program_id: PROGRAM_ID,
+                accounts: crate::accounts::Take {
+                    taker: taker.pubkey(),
+                    maker: self.maker,
+                    mint_a: self.mint_a,
+                    mint_b: self.mint_b,
+                    taker_ata_a,
+                    taker_ata_b,
+                    maker_ata_b,
+                    escrow: self.escrow,
+                    vault: self.vault,
+                    associated_token_program: spl_associated_token_account::ID,
+                    token_program: TOKEN_PROGRAM_ID,
+                    system_program: SYSTEM_PROGRAM_ID,
+                }
+                .to_account_metas(None),
+                data: crate::instruction::Take {}.data(),
+            };
+
+            let message = Message::new(&[take_ix], Some(&taker.pubkey()));
+            let transaction = Transaction::new(&[taker], message, self.program.latest_blockhash());
+            let tx = self
+                .program
+                .send_transaction(transaction)
+                .map_err(|e| format!("{:?}", e))?;
+
+            msg!("\n\nTake transaction successful");
+            msg!("CUs Consumed: {}", tx.compute_units_consumed);
+            msg!("Tx Signature: {}", tx.signature);
+
+            Ok(())
+        }
+    }
+
     #[test]
     pub fn test_make() {
-        // Setup the test environment by initializing LiteSVM and creating a payer keypair
-        let (mut program, payer) = setup();
+        let mut ctx = EscrowTestContext::new();
 
-        // Get the maker's public key from the payer keypair
-        let maker = payer.pubkey();
+        let lock_time = 0i64; // No lock for this test
+        ctx.execute_make(10_000_000, 10_000_000, lock_time);
 
-        // Create two mints (Mint A and Mint B) with 6 decimal places and the maker as the authority
-        let mint_a = CreateMint::new(&mut program, &payer)
-            .decimals(6)
-            .authority(&maker)
-            .send()
-            .unwrap();
-        msg!("Mint A: {:?}\n", mint_a);
+        // Copy pubkeys to avoid borrow issues
+        let vault = ctx.vault;
+        let escrow = ctx.escrow;
+        let maker = ctx.maker;
+        let mint_a = ctx.mint_a;
+        let mint_b = ctx.mint_b;
 
-        let mint_b = CreateMint::new(&mut program, &payer)
-            .decimals(6)
-            .authority(&maker)
-            .send()
-            .unwrap();
-        msg!("Mint B: {}\n", mint_b);
+        // Verify vault
+        let vault_balance = ctx.get_token_balance(&vault);
+        assert_eq!(vault_balance, 10_000_000);
 
-        // Create the maker's associated token account for Mint A
-        let maker_ata_a = CreateAssociatedTokenAccount::new(&mut program, &payer, &mint_a)
-            .owner(&maker)
-            .send()
-            .unwrap();
-        msg!("Maker ATA A: {}\n", maker_ata_a);
-
-        // Derive the PDA for the escrow account using the maker's public key and a seed value
-        let escrow = Pubkey::find_program_address(
-            &[b"escrow", maker.as_ref(), &123u64.to_le_bytes()],
-            &PROGRAM_ID,
-        )
-        .0;
-        msg!("Escrow PDA: {}\n", escrow);
-
-        // Derive the PDA for the vault associated token account using the escrow PDA and Mint A
-        let vault = associated_token::get_associated_token_address(&escrow, &mint_a);
-        msg!("Vault PDA: {}\n", vault);
-
-        // Define program IDs for associated token program, token program, and system program
-        let asspciated_token_program = spl_associated_token_account::ID;
-        let token_program = TOKEN_PROGRAM_ID;
-        let system_program = SYSTEM_PROGRAM_ID;
-
-        // Mint 1,000 tokens (with 6 decimal places) of Mint A to the maker's associated token account
-        MintTo::new(&mut program, &payer, &mint_a, &maker_ata_a, 1_000_000_000)
-            .send()
-            .unwrap();
-
-        // Create the "Make" instruction to deposit tokens into the escrow
-        let make_ix = Instruction {
-            program_id: PROGRAM_ID,
-            accounts: crate::accounts::Make {
-                maker: maker,
-                mint_a: mint_a,
-                mint_b: mint_b,
-                maker_ata_a: maker_ata_a,
-                escrow: escrow,
-                vault: vault,
-                associated_token_program: asspciated_token_program,
-                token_program: token_program,
-                system_program: system_program,
-            }
-            .to_account_metas(None),
-            data: crate::instruction::Make {
-                deposit: 10_000_000,
-                seed: 123u64,
-                receive: 10_000_000,
-            }
-            .data(),
-        };
-
-        // Create and send the transaction containing the "Make" instruction
-        let message = Message::new(&[make_ix], Some(&payer.pubkey()));
-        let recent_blockhash = program.latest_blockhash();
-
-        let transaction = Transaction::new(&[&payer], message, recent_blockhash);
-
-        // Send the transaction and capture the result
-        let tx = program.send_transaction(transaction).unwrap();
-
-        // Log transaction details
-        msg!("\n\nMake transaction sucessfull");
-        msg!("CUs Consumed: {}", tx.compute_units_consumed);
-        msg!("Tx Signature: {}", tx.signature);
-
-        // Verify the vault account and escrow account data after the "Make" instruction
-        let vault_account = program.get_account(&vault).unwrap();
+        let vault_account = ctx.program.get_account(&vault).unwrap();
         let vault_data = spl_token::state::Account::unpack(&vault_account.data).unwrap();
-        assert_eq!(vault_data.amount, 10_000_000);
         assert_eq!(vault_data.owner, escrow);
         assert_eq!(vault_data.mint, mint_a);
 
-        let escrow_account = program.get_account(&escrow).unwrap();
+        // Verify escrow state
+        let escrow_account = ctx.program.get_account(&escrow).unwrap();
         let escrow_data =
             crate::state::Escrow::try_deserialize(&mut escrow_account.data.as_ref()).unwrap();
         assert_eq!(escrow_data.seed, 123u64);
@@ -176,320 +287,185 @@ mod tests {
         assert_eq!(escrow_data.mint_a, mint_a);
         assert_eq!(escrow_data.mint_b, mint_b);
         assert_eq!(escrow_data.receive, 10_000_000);
+        assert_eq!(escrow_data.min_accept_lockin_time, lock_time);
     }
 
     #[test]
     pub fn test_take() {
-        let (mut program, payer) = setup();
+        let mut ctx = EscrowTestContext::new();
 
-        let maker = payer.pubkey();
-
-        // Create mints
-        let mint_a = CreateMint::new(&mut program, &payer)
-            .decimals(6)
-            .authority(&maker)
-            .send()
-            .unwrap();
-        msg!("Mint A: {}\n", mint_a);
-
-        let mint_b = CreateMint::new(&mut program, &payer)
-            .decimals(6)
-            .authority(&maker)
-            .send()
-            .unwrap();
-        msg!("Mint B: {}\n", mint_b);
-
-        // Create maker's ATA for mint_a
-        let maker_ata_a = CreateAssociatedTokenAccount::new(&mut program, &payer, &mint_a)
-            .owner(&maker)
-            .send()
-            .unwrap();
-        msg!("Maker ATA A: {}\n", maker_ata_a);
-
-        // Derive escrow and vault PDAs
-        let seed = 123u64;
-        let escrow = Pubkey::find_program_address(
-            &[b"escrow", maker.as_ref(), &seed.to_le_bytes()],
-            &PROGRAM_ID,
-        )
-        .0;
-        msg!("Escrow PDA: {}\n", escrow);
-
-        let vault = associated_token::get_associated_token_address(&escrow, &mint_a);
-        msg!("Vault PDA: {}\n", vault);
-
-        let associated_token_program = spl_associated_token_account::ID;
-        let token_program = TOKEN_PROGRAM_ID;
-        let system_program = SYSTEM_PROGRAM_ID;
-
-        // Mint 1000 tokens of mint_a to maker
-        MintTo::new(&mut program, &payer, &mint_a, &maker_ata_a, 1000000000)
-            .send()
-            .unwrap();
-
-        // Execute make instruction to create escrow
-        let make_ix = Instruction {
-            program_id: PROGRAM_ID,
-            accounts: crate::accounts::Make {
-                maker,
-                mint_a,
-                mint_b,
-                maker_ata_a,
-                escrow,
-                vault,
-                associated_token_program,
-                token_program,
-                system_program,
-            }
-            .to_account_metas(None),
-            data: crate::instruction::Make {
-                deposit: 100_000_000,
-                seed,
-                receive: 50_000_000,
-            }
-            .data(),
-        };
-
-        let message = Message::new(&[make_ix], Some(&payer.pubkey()));
-        let transaction = Transaction::new(&[&payer], message, program.latest_blockhash());
-        program.send_transaction(transaction).unwrap();
-        msg!("Make transaction successful\n");
+        let lock_time = 0i64; // No lock for this test
+        ctx.execute_make(100_000_000, 50_000_000, lock_time);
 
         // Create taker
         let taker = Keypair::new();
-        program
+        ctx.program
             .airdrop(&taker.pubkey(), 10 * LAMPORTS_PER_SOL)
             .unwrap();
         msg!("Taker: {}\n", taker.pubkey());
 
-        // Create taker's ATAs for both mints
-        let taker_ata_a = associated_token::get_associated_token_address(&taker.pubkey(), &mint_a);
+        // Create taker's ATAs
+        let taker_ata_a =
+            associated_token::get_associated_token_address(&taker.pubkey(), &ctx.mint_a);
         msg!("Taker ATA A: {}\n", taker_ata_a);
 
-        let taker_ata_b = CreateAssociatedTokenAccount::new(&mut program, &taker, &mint_b)
+        let taker_ata_b = CreateAssociatedTokenAccount::new(&mut ctx.program, &taker, &ctx.mint_b)
             .owner(&taker.pubkey())
             .send()
             .unwrap();
         msg!("Taker ATA B: {}\n", taker_ata_b);
 
-        // Maker's ATA for mint_b (will be created by take instruction)
-        let maker_ata_b = associated_token::get_associated_token_address(&maker, &mint_b);
+        let maker_ata_b = associated_token::get_associated_token_address(&ctx.maker, &ctx.mint_b);
         msg!("Maker ATA B: {}\n", maker_ata_b);
 
-        // Mint 50 tokens of mint_b to taker
-        MintTo::new(&mut program, &payer, &mint_b, &taker_ata_b, 50_000_000)
-            .send()
-            .unwrap();
+        // Mint tokens to taker
+        MintTo::new(
+            &mut ctx.program,
+            &ctx.payer,
+            &ctx.mint_b,
+            &taker_ata_b,
+            50_000_000,
+        )
+        .send()
+        .unwrap();
 
         // Execute take instruction
-        let take_ix = Instruction {
-            program_id: PROGRAM_ID,
-            accounts: crate::accounts::Take {
-                taker: taker.pubkey(),
-                maker,
-                mint_a,
-                mint_b,
-                taker_ata_a,
-                taker_ata_b,
-                maker_ata_b,
-                escrow,
-                vault,
-                associated_token_program,
-                token_program,
-                system_program,
-            }
-            .to_account_metas(None),
-            data: crate::instruction::Take {}.data(),
-        };
+        ctx.execute_take(&taker, taker_ata_a, taker_ata_b, maker_ata_b)
+            .unwrap();
 
-        let message = Message::new(&[take_ix], Some(&taker.pubkey()));
-        let transaction = Transaction::new(&[&taker], message, program.latest_blockhash());
-        let tx = program.send_transaction(transaction).unwrap();
+        // Verify balances
+        assert_eq!(ctx.get_token_balance(&taker_ata_a), 100_000_000);
+        assert_eq!(ctx.get_token_balance(&maker_ata_b), 50_000_000);
+        assert_eq!(ctx.get_token_balance(&taker_ata_b), 0);
 
-        msg!("\n\nTake transaction successful");
-        msg!("CUs Consumed: {}", tx.compute_units_consumed);
-        msg!("Tx Signature: {}", tx.signature);
+        // Copy pubkeys to avoid borrow issues
+        let vault = ctx.vault;
+        let escrow = ctx.escrow;
 
-        // Verify taker received mint_a tokens
-        let taker_ata_a_account = program.get_account(&taker_ata_a).unwrap();
-        let taker_ata_a_data =
-            spl_token::state::Account::unpack(&taker_ata_a_account.data).unwrap();
-        assert_eq!(taker_ata_a_data.amount, 100_000_000);
-        assert_eq!(taker_ata_a_data.owner, taker.pubkey());
-
-        // Verify maker received mint_b tokens
-        let maker_ata_b_account = program.get_account(&maker_ata_b).unwrap();
-        let maker_ata_b_data =
-            spl_token::state::Account::unpack(&maker_ata_b_account.data).unwrap();
-        assert_eq!(maker_ata_b_data.amount, 50_000_000);
-        assert_eq!(maker_ata_b_data.owner, maker);
-
-        // Verify taker spent mint_b tokens
-        let taker_ata_b_account = program.get_account(&taker_ata_b).unwrap();
-        let taker_ata_b_data =
-            spl_token::state::Account::unpack(&taker_ata_b_account.data).unwrap();
-        assert_eq!(taker_ata_b_data.amount, 0);
-
-        // Verify vault is closed (lamports should be 0)
-        let vault_after = program.get_account(&vault);
-        if let Some(vault_account) = vault_after {
-            assert_eq!(
-                vault_account.lamports, 0,
-                "Vault should have 0 lamports after closure"
-            );
-        }
-
-        // Verify escrow is closed (lamports should be 0)
-        let escrow_after = program.get_account(&escrow);
-        if let Some(escrow_account) = escrow_after {
-            assert_eq!(
-                escrow_account.lamports, 0,
-                "Escrow should have 0 lamports after closure"
-            );
-        }
+        // Verify accounts closed
+        ctx.assert_account_closed(&vault, "Vault");
+        ctx.assert_account_closed(&escrow, "Escrow");
     }
 
     #[test]
     pub fn test_refund() {
-        // first we'll do make ix, then we do refund
+        let mut ctx = EscrowTestContext::new();
 
-        let (mut program, payer) = setup();
+        let lock_time = 0i64;
+        ctx.execute_make(100_000_000, 50_000_000, lock_time);
 
-        let maker = payer.pubkey();
+        let maker_ata_a = ctx.maker_ata_a;
+        let balance_before = ctx.get_token_balance(&maker_ata_a);
+        msg!("Maker ATA A balance before refund: {}\n", balance_before);
 
-        // Create mints
-        let mint_a = CreateMint::new(&mut program, &payer)
-            .decimals(6)
-            .authority(&maker)
+        ctx.execute_refund();
+
+        let balance_after = ctx.get_token_balance(&maker_ata_a);
+        assert_eq!(balance_after, balance_before + 100_000_000);
+        msg!("Maker ATA A balance after refund: {}\n", balance_after);
+
+        // Copy pubkeys to avoid borrow issues
+        let vault = ctx.vault;
+        let escrow = ctx.escrow;
+
+        ctx.assert_account_closed(&vault, "Vault");
+        ctx.assert_account_closed(&escrow, "Escrow");
+    }
+
+    #[test]
+    pub fn test_take_with_time_lock_fails_before_unlock() {
+        let mut ctx = EscrowTestContext::new();
+
+        // Set lock time to far future (2 hours from epoch ~1970)
+        // This ensures current time will always be less than lock time
+        let lock_time = i64::MAX - 1000;
+
+        ctx.execute_make(100_000_000, 50_000_000, lock_time);
+
+        // Create taker
+        let taker = Keypair::new();
+        ctx.program
+            .airdrop(&taker.pubkey(), 10 * LAMPORTS_PER_SOL)
+            .unwrap();
+
+        // Create taker's ATAs
+        let taker_ata_a =
+            associated_token::get_associated_token_address(&taker.pubkey(), &ctx.mint_a);
+
+        let taker_ata_b = CreateAssociatedTokenAccount::new(&mut ctx.program, &taker, &ctx.mint_b)
+            .owner(&taker.pubkey())
             .send()
             .unwrap();
-        msg!("Mint A: {}\n", mint_a);
 
-        let mint_b = CreateMint::new(&mut program, &payer)
-            .decimals(6)
-            .authority(&maker)
-            .send()
-            .unwrap();
-        msg!("Mint B: {}\n", mint_b);
+        let maker_ata_b = associated_token::get_associated_token_address(&ctx.maker, &ctx.mint_b);
 
-        // Create maker's ATA for mint_a
-        let maker_ata_a = CreateAssociatedTokenAccount::new(&mut program, &payer, &mint_a)
-            .owner(&maker)
-            .send()
-            .unwrap();
-        msg!("Maker ATA A: {}\n", maker_ata_a);
-
-        // Derive escrow and vault PDAs
-        let seed = 123u64;
-        let escrow = Pubkey::find_program_address(
-            &[b"escrow", maker.as_ref(), &seed.to_le_bytes()],
-            &PROGRAM_ID,
+        // Mint tokens to taker
+        MintTo::new(
+            &mut ctx.program,
+            &ctx.payer,
+            &ctx.mint_b,
+            &taker_ata_b,
+            50_000_000,
         )
-        .0;
-        msg!("Escrow PDA: {}\n", escrow);
+        .send()
+        .unwrap();
 
-        let vault = associated_token::get_associated_token_address(&escrow, &mint_a);
-        msg!("Vault PDA: {}\n", vault);
+        // Attempt to take before time lock expires - should fail
+        let result = ctx.execute_take(&taker, taker_ata_a, taker_ata_b, maker_ata_b);
 
-        let associated_token_program = spl_associated_token_account::ID;
-        let token_program = TOKEN_PROGRAM_ID;
-        let system_program = SYSTEM_PROGRAM_ID;
+        assert!(
+            result.is_err(),
+            "Take should fail when time lock not elapsed"
+        );
+        msg!("✓ Take correctly failed before time lock elapsed");
+    }
 
-        // Mint 1000 tokens of mint_a to maker
-        MintTo::new(&mut program, &payer, &mint_a, &maker_ata_a, 1000000000)
+    #[test]
+    pub fn test_take_with_time_lock_succeeds_after_unlock() {
+        let mut ctx = EscrowTestContext::new();
+
+        // Set lock time to 0 (always in the past, already elapsed)
+        let lock_time = 0i64;
+
+        ctx.execute_make(100_000_000, 50_000_000, lock_time);
+
+        // Create taker
+        let taker = Keypair::new();
+        ctx.program
+            .airdrop(&taker.pubkey(), 10 * LAMPORTS_PER_SOL)
+            .unwrap();
+
+        // Create taker's ATAs
+        let taker_ata_a =
+            associated_token::get_associated_token_address(&taker.pubkey(), &ctx.mint_a);
+
+        let taker_ata_b = CreateAssociatedTokenAccount::new(&mut ctx.program, &taker, &ctx.mint_b)
+            .owner(&taker.pubkey())
             .send()
             .unwrap();
 
-        // Execute make instruction to create escrow
-        let make_ix = Instruction {
-            program_id: PROGRAM_ID,
-            accounts: crate::accounts::Make {
-                maker,
-                mint_a,
-                mint_b,
-                maker_ata_a,
-                escrow,
-                vault,
-                associated_token_program,
-                token_program,
-                system_program,
-            }
-            .to_account_metas(None),
-            data: crate::instruction::Make {
-                deposit: 100_000_000,
-                seed,
-                receive: 50_000_000,
-            }
-            .data(),
-        };
+        let maker_ata_b = associated_token::get_associated_token_address(&ctx.maker, &ctx.mint_b);
 
-        let message = Message::new(&[make_ix], Some(&payer.pubkey()));
-        let transaction = Transaction::new(&[&payer], message, program.latest_blockhash());
-        program.send_transaction(transaction).unwrap();
-        msg!("Make transaction successful\n");
+        // Mint tokens to taker
+        MintTo::new(
+            &mut ctx.program,
+            &ctx.payer,
+            &ctx.mint_b,
+            &taker_ata_b,
+            50_000_000,
+        )
+        .send()
+        .unwrap();
 
-        // Get maker's token balance before refund
-        let maker_ata_a_before = program.get_account(&maker_ata_a).unwrap();
-        let maker_balance_before =
-            spl_token::state::Account::unpack(&maker_ata_a_before.data).unwrap();
-        msg!(
-            "Maker ATA A balance before refund: {}\n",
-            maker_balance_before.amount
-        );
+        // Take after time lock elapsed - should succeed
+        ctx.execute_take(&taker, taker_ata_a, taker_ata_b, maker_ata_b)
+            .unwrap();
 
-        // Execute refund instruction
-        let refund_ix = Instruction {
-            program_id: PROGRAM_ID,
-            accounts: crate::accounts::Refund {
-                maker,
-                mint_a,
-                maker_ata_a,
-                escrow,
-                vault,
-                token_program,
-                system_program,
-            }
-            .to_account_metas(None),
-            data: crate::instruction::Refund {}.data(),
-        };
+        // Verify balances
+        assert_eq!(ctx.get_token_balance(&taker_ata_a), 100_000_000);
+        assert_eq!(ctx.get_token_balance(&maker_ata_b), 50_000_000);
+        assert_eq!(ctx.get_token_balance(&taker_ata_b), 0);
 
-        let message = Message::new(&[refund_ix], Some(&payer.pubkey()));
-        let transaction = Transaction::new(&[&payer], message, program.latest_blockhash());
-        let tx = program.send_transaction(transaction).unwrap();
-
-        msg!("\n\nRefund transaction successful");
-        msg!("CUs Consumed: {}", tx.compute_units_consumed);
-        msg!("Tx Signature: {}", tx.signature);
-
-        // Verify maker received tokens back
-        let maker_ata_a_after = program.get_account(&maker_ata_a).unwrap();
-        let maker_balance_after =
-            spl_token::state::Account::unpack(&maker_ata_a_after.data).unwrap();
-        assert_eq!(
-            maker_balance_after.amount,
-            maker_balance_before.amount + 100_000_000
-        );
-        msg!(
-            "Maker ATA A balance after refund: {}\n",
-            maker_balance_after.amount
-        );
-
-        // Verify vault is closed (lamports should be 0)
-        let vault_after = program.get_account(&vault);
-        if let Some(vault_account) = vault_after {
-            assert_eq!(
-                vault_account.lamports, 0,
-                "Vault should have 0 lamports after closure"
-            );
-        }
-
-        // Verify escrow is closed (lamports should be 0)
-        let escrow_after = program.get_account(&escrow);
-        if let Some(escrow_account) = escrow_after {
-            assert_eq!(
-                escrow_account.lamports, 0,
-                "Escrow should have 0 lamports after closure"
-            );
-        }
+        msg!("✓ Take succeeded after time lock elapsed");
     }
 }
