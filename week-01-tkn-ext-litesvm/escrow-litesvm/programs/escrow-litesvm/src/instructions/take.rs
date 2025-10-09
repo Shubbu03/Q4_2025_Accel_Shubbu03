@@ -7,7 +7,7 @@ use anchor_spl::{
     },
 };
 
-use crate::state::Escrow;
+use crate::{error::EscrowError, state::Escrow};
 
 //Create context
 #[derive(Accounts)]
@@ -64,6 +64,13 @@ pub struct Take<'info> {
 //Close vault account
 impl<'info> Take<'info> {
     pub fn deposit(&mut self) -> Result<()> {
+        let curr_time = Clock::get()?.unix_timestamp;
+
+        require!(
+            curr_time >= self.escrow.min_accept_lockin_time,
+            EscrowError::TakeOfferTimeNotElapsed
+        );
+
         let cpi_program = self.token_program.to_account_info();
 
         let cpi_accounts = TransferChecked {
@@ -79,6 +86,13 @@ impl<'info> Take<'info> {
     }
 
     pub fn withdraw_and_close_vault(&mut self) -> Result<()> {
+        let curr_time = Clock::get()?.unix_timestamp;
+
+        require!(
+            curr_time >= self.escrow.min_accept_lockin_time,
+            EscrowError::TakeOfferTimeNotElapsed
+        );
+
         let signer_seeds: [&[&[u8]]; 1] = [&[
             b"escrow",
             self.maker.key.as_ref(),
