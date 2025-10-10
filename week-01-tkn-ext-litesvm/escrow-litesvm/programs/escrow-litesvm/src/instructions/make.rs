@@ -53,7 +53,7 @@ impl<'info> Make<'info> {
             mint_a: self.mint_a.key(),
             mint_b: self.mint_b.key(),
             receive,
-            min_accept_lockin_time,
+            min_accept_lockin_time: Clock::get()?.unix_timestamp + min_accept_lockin_time,
             bump: bumps.escrow,
         });
 
