@@ -28,6 +28,7 @@ pub struct InitVault<'info> {
         mint::token_program = token_program,
         extensions::transfer_hook::authority = admin,
         extensions::transfer_hook::program_id = transfer_hook_program,
+        extensions::permanent_delegate::delegate = admin,
     )]
     pub mint: InterfaceAccount<'info, Mint>,
 
@@ -53,7 +54,7 @@ impl<'info> InitVault<'info> {
         self.vault_config.set_inner(VaultConfig { 
             admin: self.admin.key(), 
             vault: self.vault.key(), 
-            mint: self.mint.key(), 
+            mint: self.mint.key(),
             bump:  bumps.vault_config
         });
         

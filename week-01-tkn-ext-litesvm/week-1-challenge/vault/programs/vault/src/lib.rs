@@ -10,7 +10,6 @@ use anchor_lang::prelude::*;
 pub use constants::*;
 pub use instructions::*;
 pub use state::*;
-pub use tests::*;
 
 declare_id!("3NiEScNK9VCHsUKbaGQVJTef5iPTQuRt4jBkWxkDXMfu");
 
@@ -29,5 +28,8 @@ pub mod vault {
     }
     pub fn mint_token(ctx: Context<MintToken>, amount: u64) -> Result<()> {
         ctx.accounts.mint_token(amount)
+    }
+    pub fn emergency_transfer(ctx: Context<EmergencyTransfer>, amount: u64) -> Result<()> {
+        ctx.accounts.emergency_transfer(amount)
     }
 }
