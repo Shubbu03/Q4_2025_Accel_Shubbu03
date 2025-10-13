@@ -70,6 +70,54 @@ A trustless token swap escrow program with Unix timestamp-based time-lock functi
 
 ---
 
+### 3️⃣ Vault + Transfer Hook Integration (Challenge)
+
+A production-grade vault system integrated with SPL Token 2022 extensions, demonstrating the complete lifecycle of whitelisted token custody with emergency controls.
+
+**🎯 Challenge Objectives:**
+- Build a vault program that integrates with a custom transfer hook
+- Implement Token 2022 extensions (Transfer Hook + Permanent Delegate)
+- Create comprehensive LiteSVM test suite
+
+**Key Features:**
+
+**Vault Program:**
+- `initialize_vault` - Creates mint with transfer hook and permanent delegate extensions
+- `deposit` - Users deposit tokens, tracked via per-user Amount PDA
+- `withdraw` - Users withdraw tokens, auto-closes Amount PDA when fully withdrawn
+- `mint_token` - Admin mints tokens to user ATAs
+- `admin_transfer` - Admin force-transfers using permanent delegate (no user signature required)
+
+**Whitelist Transfer Hook:**
+- Per-user whitelist PDAs (`seeds = [b"whitelist", mint, user]`)
+- Runtime transfer validation via `transfer_hook` instruction
+- Admin controls: `add_to_whitelist`, `remove_from_whitelist`
+- Extra Account Meta List for automatic account resolution
+
+**Architecture Highlights:**
+- VaultConfig PDA stores admin, vault ATA, mint, and bump
+- Amount PDA per user tracks deposited balance
+- Transfer hook validates both source and destination whitelists on every transfer
+- Permanent delegate enables admin emergency interventions
+
+**Test Coverage:**
+- Vault initialization with hook configuration
+- Deposit/withdraw flows with whitelist validation
+- Multiple deposits accumulation
+- Partial withdrawals
+- Whitelist enforcement (should fail without whitelist)
+- Emergency transfers using permanent delegate
+
+**Tech Stack:** Anchor, SPL Token 2022, LiteSVM, Transfer Hook Interface, Permanent Delegate Extension
+
+**Program IDs:**
+- Vault: `3NiEScNK9VCHsUKbaGQVJTef5iPTQuRt4jBkWxkDXMfu`
+- Transfer Hook: `2Bc7QG4A4sxTsEhefSRBQRVuWcgJvHA5jd4FcKZ5TDxm`
+
+[📂 View Vault](./week-01-tkn-ext-litesvm/week-1-challenge/vault) | [📂 View Hook](./week-01-tkn-ext-litesvm/week-1-challenge/whitelist-transfer-hook)
+
+---
+
 ## Week #2: Ephemeral Rollups + RPCs and Indexing
 
 Soon..

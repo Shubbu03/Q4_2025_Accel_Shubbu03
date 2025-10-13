@@ -6,7 +6,7 @@ use anchor_spl::token_interface::{
 use crate::VaultConfig;
 
 #[derive(Accounts)]
-pub struct EmergencyTransfer<'info> {
+pub struct AdminTransfer<'info> {
     #[account(mut)]
     pub admin: Signer<'info>,
 
@@ -40,8 +40,8 @@ pub struct EmergencyTransfer<'info> {
     pub token_program: Interface<'info, TokenInterface>,
 }
 
-impl<'info> EmergencyTransfer<'info> {
-    pub fn emergency_transfer(&mut self, amount: u64) -> Result<()> {
+impl<'info> AdminTransfer<'info> {
+    pub fn admin_transfer(&mut self, amount: u64) -> Result<()> {
        
         // Admin acts as permanent delegate - can transfer without owner signature
         let transfer_cpi_program = self.token_program.to_account_info();
