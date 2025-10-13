@@ -11,6 +11,7 @@ Q4_2025_Accel_Shubbu03/
 ├── week-01-tkn-ext-litesvm/          # Token Extensions & LiteSVM
 │   ├── whitelist-transfer-hook/      # Transfer hook implementation
 │   └── escrow-litesvm/               # Escrow with time-lock & LiteSVM tests
+│   └── week-1-challenge/               # Vault with transfer hook functionality
 └── README.md
 ```
 
