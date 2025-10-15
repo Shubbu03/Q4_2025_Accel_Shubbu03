@@ -6,6 +6,7 @@ use crate::state::UserAccount;
 pub struct InitUser<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
+
     #[account(
         init,
         payer = user,
@@ -14,17 +15,18 @@ pub struct InitUser<'info> {
         bump
     )]
     pub user_account: Account<'info, UserAccount>,
+
     pub system_program: Program<'info, System>,
 }
 
 impl<'info> InitUser<'info> {
     pub fn initialize(&mut self, bumps: &InitUserBumps) -> Result<()> {
-        self.user_account.set_inner(UserAccount { 
-            user: *self.user.key, 
-            data: 0, 
-            bump: bumps.user_account 
+        self.user_account.set_inner(UserAccount {
+            user: *self.user.key,
+            data: 0,
+            bump: bumps.user_account,
         });
-        
+
         Ok(())
     }
 }

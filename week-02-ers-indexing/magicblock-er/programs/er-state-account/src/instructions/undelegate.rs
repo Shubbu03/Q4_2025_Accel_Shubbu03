@@ -9,6 +9,7 @@ use crate::state::UserAccount;
 pub struct Undelegate<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
+    
     #[account(
         mut,
         seeds = [b"user", user.key().as_ref()],

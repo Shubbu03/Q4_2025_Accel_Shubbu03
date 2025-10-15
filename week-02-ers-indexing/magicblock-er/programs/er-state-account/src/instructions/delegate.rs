@@ -8,6 +8,7 @@ use crate::state::UserAccount;
 pub struct Delegate<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
+
     #[account(
         mut,
         del,
@@ -15,8 +16,10 @@ pub struct Delegate<'info> {
         bump = user_account.bump,
     )]
     pub user_account: Account<'info, UserAccount>,
+
     /// CHECK: This is not dangerous because we don't read or write from this account
     pub validator: UncheckedAccount<'info>,
+    
     pub system_program: Program<'info, System>,
 }
 

@@ -6,6 +6,7 @@ use crate::state::UserAccount;
 pub struct CloseUser<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
+
     #[account(
         mut,
         close = user,
@@ -13,6 +14,7 @@ pub struct CloseUser<'info> {
         bump = user_account.bump,
     )]
     pub user_account: Box<Account<'info, UserAccount>>,
+    
     pub system_program: Program<'info, System>,
 }
 

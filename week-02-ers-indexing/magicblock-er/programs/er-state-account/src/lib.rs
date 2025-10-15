@@ -17,38 +17,33 @@ pub mod er_state_account {
     use super::*;
 
     pub fn initialize(ctx: Context<InitUser>) -> Result<()> {
-        ctx.accounts.initialize(&ctx.bumps)?;
-
-        Ok(())
+        ctx.accounts.initialize(&ctx.bumps)
     }
 
-    pub fn update(ctx: Context<UpdateUser>, new_data: u64) -> Result<()> {
-        ctx.accounts.update(new_data)?;
-
-        Ok(())
+    pub fn update(ctx: Context<UpdateUser>, randomness: [u8; 32]) -> Result<()> {
+        ctx.accounts.update(randomness)
     }
 
     pub fn update_commit(ctx: Context<UpdateCommit>, new_data: u64) -> Result<()> {
-        ctx.accounts.update_commit(new_data)?;
-
-        Ok(())
+        ctx.accounts.update_commit(new_data)
     }
 
     pub fn delegate(ctx: Context<Delegate>) -> Result<()> {
-        ctx.accounts.delegate()?;
-
-        Ok(())
+        ctx.accounts.delegate()
     }
 
     pub fn undelegate(ctx: Context<Undelegate>) -> Result<()> {
-        ctx.accounts.undelegate()?;
-
-        Ok(())
+        ctx.accounts.undelegate()
     }
 
     pub fn close(ctx: Context<CloseUser>) -> Result<()> {
-        ctx.accounts.close()?;
+        ctx.accounts.close()
+    }
 
-        Ok(())
+    pub fn request_randomness(
+        ctx: Context<RequestRandomness>,
+        caller_seed: [u8; 32],
+    ) -> Result<()> {
+        ctx.accounts.request_randomness(caller_seed)
     }
 }
