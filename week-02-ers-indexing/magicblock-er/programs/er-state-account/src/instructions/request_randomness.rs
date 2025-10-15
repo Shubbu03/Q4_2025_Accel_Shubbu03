@@ -41,10 +41,6 @@ pub struct RequestRandomness<'info> {
 
 impl<'info> RequestRandomness<'info> {
     pub fn request_randomness(&mut self, caller_seed: [u8; 32]) -> Result<()> {
-        // let callback_discriminator =
-        //     anchor_lang::solana_program::hash::hash(b"global:consume_randomness").to_bytes()[..8]
-        //         .to_vec();
-
         let callback_discriminator = instruction::Update::DISCRIMINATOR.to_vec();
 
         let callback_accounts_metas = vec![
