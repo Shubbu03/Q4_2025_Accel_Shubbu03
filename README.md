@@ -10,8 +10,10 @@ The repository is organized by weeks, with each week focusing on specific Solana
 Q4_2025_Accel_Shubbu03/
 ├── week-01-tkn-ext-litesvm/          # Token Extensions & LiteSVM
 │   ├── whitelist-transfer-hook/      # Transfer hook implementation
-│   └── escrow-litesvm/               # Escrow with time-lock & LiteSVM tests
-│   └── week-1-challenge/               # Vault with transfer hook functionality
+│   ├── escrow-litesvm/               # Escrow with time-lock & LiteSVM tests
+│   └── week-1-challenge/             # Vault with transfer hook functionality
+├── week-02-ers-indexing/             # Ephemeral Rollups & Indexing
+│   └── magicblock-er/                # MagicBlock ER state management with VRF
 └── README.md
 ```
 
@@ -121,7 +123,69 @@ A production-grade vault system integrated with SPL Token 2022 extensions, demon
 
 ## Week #2: Ephemeral Rollups + RPCs and Indexing
 
-Soon..
+This week explored MagicBlock's Ephemeral Rollups for high-throughput state management and VRF for verifiable randomness on Solana.
+
+### 1️⃣ MagicBlock Ephemeral Rollups State Account
+
+A PDA-based user account system demonstrating delegation to ephemeral rollups for fast, low-cost state mutations with VRF integration.
+
+**🎯 Core Concepts:**
+- **Ephemeral Rollups**: Off-chain execution layer that commits state back to Solana base layer
+- **Delegate/Undelegate Pattern**: Move accounts between base layer and ephemeral rollup
+- **VRF Integration**: Switchboard-powered verifiable randomness for unpredictable state updates
+- **Two-Layer Architecture**: Fast mutations on ephemeral layer, finality on base layer
+
+**Key Features:**
+
+**State Management:**
+- `initialize` - Creates PDA user account on base layer (`seeds = [b"user", user_pubkey]`)
+- `delegate` - Moves account to ephemeral rollup for high-speed mutations
+- `undelegate` - Commits final state and returns account to base layer
+- `update` - VRF callback that updates state with verifiable randomness
+- `update_commit` - Updates state on ephemeral rollup with auto-commit to base layer
+- `close` - Closes account and reclaims rent
+
+**UserAccount State:**
+```rust
+pub struct UserAccount {
+    pub user: Pubkey,   // Owner
+    pub data: u64,      // Mutable state
+    pub bump: u8,       // PDA bump seed
+}
+```
+
+**Architecture Flow:**
+```
+Base Layer (Solana Devnet)
+    ↓ delegate
+Ephemeral Rollup (MagicBlock)
+    ↓ high-speed mutations (update_commit)
+    ↓ VRF randomness requests
+    ↓ commit
+Base Layer (state persisted)
+```
+
+**VRF Integration:**
+- Uses Switchboard oracle queues for randomness requests
+- `request_randomness` instruction with caller seed
+- Callback to `update` instruction with 32-byte random value
+- Enables unpredictable state changes (gaming, lotteries, random selection)
+
+**Ephemeral Rollups Benefits:**
+- **10-100x cheaper** transactions on ephemeral layer
+- **Sub-second finality** for state mutations
+- **Automatic commitment** back to base layer for security
+- **Validator delegation** for custom execution environments
+
+**Tech Stack:** Anchor, MagicBlock Ephemeral Rollups SDK, Magicblock VRF
+
+**Program ID:** `9ChqoFDgVmmvD6Hcajv2JppVZ7S1qPDozrTw4V7q2yLP`
+
+**Endpoints:**
+- Base Layer: `https://api.devnet.solana.com`
+- Ephemeral Rollup: `https://devnet.magicblock.app/`
+
+[📂 View Project](./week-02-ers-indexing/magicblock-er)
 
 ---
 
