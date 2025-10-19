@@ -13,7 +13,8 @@ Q4_2025_Accel_Shubbu03/
 │   ├── escrow-litesvm/               # Escrow with time-lock & LiteSVM tests
 │   └── week-1-challenge/             # Vault with transfer hook functionality
 ├── week-02-ers-indexing/             # Ephemeral Rollups & Indexing
-│   └── magicblock-er/                # MagicBlock ER state management with VRF
+│   ├── magicblock-er/                # MagicBlock ER state management with VRF
+│   └── magicblock-er-ai-agent/       # AI-powered wallet analysis with Solana GPT Oracle
 └── README.md
 ```
 
@@ -186,6 +187,88 @@ Base Layer (state persisted)
 - Ephemeral Rollup: `https://devnet.magicblock.app/`
 
 [📂 View Project](./week-02-ers-indexing/magicblock-er)
+
+---
+
+### 2️⃣ MagicBlock ER AI Agent
+
+A full-stack AI-powered wallet analysis system that leverages Solana GPT Oracle for intelligent transaction pattern analysis with a modern Next.js frontend.
+
+**🎯 Core Concepts:**
+- **AI Integration**: Solana GPT Oracle for LLM-powered wallet analysis
+- **Asynchronous Processing**: CPI calls to oracle with callback pattern
+- **Full-Stack Architecture**: Rust program + Next.js frontend
+- **Real-time Analysis**: Polling mechanism for AI response handling
+
+**Key Features:**
+
+**Solana Program:**
+- `initialize` - Sets up AI agent with LLM context reference
+- `analyze_user` - Triggers AI analysis via CPI to Solana GPT Oracle
+- `callback_from_agent` - Handles AI responses and stores analysis results
+- `get_analysis` - Retrieves stored analysis for frontend consumption
+
+**Frontend Client:**
+- **Next.js 15** with TypeScript and Tailwind CSS
+- **Wallet Integration** via Solana wallet adapter
+- **Real-time UI** with loading states and error handling
+- **Public Key Validation** and input sanitization
+- **Analysis Polling** for async AI response handling
+
+**AI Analysis Flow:**
+```
+User Input (Public Key)
+    ↓
+Frontend Validation
+    ↓
+Program: analyze_user()
+    ↓
+CPI to Solana GPT Oracle
+    ↓
+AI Processing (Async)
+    ↓
+callback_from_agent()
+    ↓
+Store Analysis Result
+    ↓
+Frontend Polling
+    ↓
+Display Results
+```
+
+**Account Structure:**
+- **Agent Account** - Stores LLM context reference and configuration
+- **Analysis Result** - Stores AI analysis with user, analysis text, timestamp
+- **Oracle Integration** - Uses Solana GPT Oracle for AI processing
+
+**State Management:**
+```rust
+pub struct Agent {
+    pub context: Pubkey,  // LLM context reference
+    pub bump: u8,
+}
+
+pub struct AnalysisResult {
+    pub user: Pubkey,
+    pub analysis: String,  // Max 500 chars
+    pub timestamp: i64,
+    pub bump: u8,
+}
+```
+
+**Frontend Features:**
+- Wallet connection and management
+- Public key input with validation
+- Real-time analysis status updates
+- Modern, responsive dark mode UI
+- Error handling and user feedback
+- TypeScript type safety throughout
+
+**Tech Stack:** Anchor, Solana GPT Oracle, Next.js 15, TypeScript, Tailwind CSS, Solana Wallet Adapter
+
+**Program ID:** `53GFYSJPbrYcaqD3o54z5WCWcCM8WGqixgUjc4nsw2tY`
+
+[📂 View Project](./week-02-ers-indexing/magicblock-er-ai-agent)
 
 ---
 
