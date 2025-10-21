@@ -1,0 +1,453 @@
+{
+  "address": "53GFYSJPbrYcaqD3o54z5WCWcCM8WGqixgUjc4nsw2tY",
+  "metadata": {
+    "name": "magicblock_er_ai_agent",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "analyze_user",
+      "discriminator": [
+        59,
+        251,
+        239,
+        197,
+        26,
+        249,
+        2,
+        30
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "interaction",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  116,
+                  101,
+                  114,
+                  97,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payer"
+              },
+              {
+                "kind": "account",
+                "path": "context_account"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "oracle_program"
+            }
+          }
+        },
+        {
+          "name": "agent",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "context_account"
+        },
+        {
+          "name": "oracle_program",
+          "address": "LLMrieZMpbJFwN52WgmBNMxYojrpRVYXdC1RCweEbab"
+        },
+        {
+          "name": "analysis_result",
+          "docs": [
+            "Analysis result account - initialized here so callback can update it"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  110,
+                  97,
+                  108,
+                  121,
+                  115,
+                  105,
+                  115
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "user_pubkey"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "user_pubkey",
+          "type": "pubkey"
+        },
+        {
+          "name": "user_data",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "callback_from_agent",
+      "discriminator": [
+        152,
+        228,
+        9,
+        75,
+        159,
+        238,
+        133,
+        197
+      ],
+      "accounts": [
+        {
+          "name": "analysis_result",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  110,
+                  97,
+                  108,
+                  121,
+                  115,
+                  105,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user_pubkey"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_pubkey"
+        },
+        {
+          "name": "identity"
+        },
+        {
+          "name": "oracle_program",
+          "address": "LLMrieZMpbJFwN52WgmBNMxYojrpRVYXdC1RCweEbab"
+        }
+      ],
+      "args": [
+        {
+          "name": "response",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "get_analysis",
+      "discriminator": [
+        202,
+        82,
+        157,
+        17,
+        61,
+        66,
+        106,
+        19
+      ],
+      "accounts": [
+        {
+          "name": "analysis_result",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  110,
+                  97,
+                  108,
+                  121,
+                  115,
+                  105,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user_pubkey"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_pubkey"
+        }
+      ],
+      "args": [],
+      "returns": "string"
+    },
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "llm_context",
+          "writable": true
+        },
+        {
+          "name": "counter",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "oracle_program",
+          "address": "LLMrieZMpbJFwN52WgmBNMxYojrpRVYXdC1RCweEbab"
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Agent",
+      "discriminator": [
+        47,
+        166,
+        112,
+        147,
+        155,
+        197,
+        86,
+        7
+      ]
+    },
+    {
+      "name": "AnalysisResult",
+      "discriminator": [
+        168,
+        128,
+        13,
+        80,
+        232,
+        23,
+        254,
+        152
+      ]
+    },
+    {
+      "name": "ContextAccount",
+      "discriminator": [
+        75,
+        176,
+        185,
+        173,
+        144,
+        35,
+        90,
+        109
+      ]
+    },
+    {
+      "name": "Counter",
+      "discriminator": [
+        255,
+        176,
+        4,
+        245,
+        188,
+        253,
+        124,
+        25
+      ]
+    },
+    {
+      "name": "Identity",
+      "discriminator": [
+        58,
+        132,
+        5,
+        12,
+        176,
+        164,
+        85,
+        112
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidOracleCallback",
+      "msg": "Invalid oracle callback"
+    },
+    {
+      "code": 6001,
+      "name": "AnalysisNotFound",
+      "msg": "Analysis not found"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidUserPubkey",
+      "msg": "Invalid user pubkey"
+    },
+    {
+      "code": 6003,
+      "name": "UnauthorizedOracle",
+      "msg": "Oracle program not authorized"
+    }
+  ],
+  "types": [
+    {
+      "name": "Agent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "context",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AnalysisResult",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "analysis",
+            "type": "string"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ContextAccount",
+      "docs": [
+        "Accounts"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "text",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Counter",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "count",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Identity",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    }
+  ]
+}
