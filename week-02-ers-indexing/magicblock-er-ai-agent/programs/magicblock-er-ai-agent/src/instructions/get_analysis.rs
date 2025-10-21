@@ -5,7 +5,7 @@ use anchor_lang::prelude::*;
 pub struct GetAnalysis<'info> {
     #[account(
         seeds = [b"analysis", user_pubkey.key().as_ref()],
-        bump = analysis_result.bump
+        bump
     )]
     pub analysis_result: Account<'info, AnalysisResult>,
 

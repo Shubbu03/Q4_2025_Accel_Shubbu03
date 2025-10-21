@@ -20,8 +20,12 @@ pub mod magicblock_er_ai_agent {
         ctx.accounts.init_llm(&ctx.bumps)
     }
 
-    pub fn analyze_user(ctx: Context<AnalyzeUser>, user_pubkey: Pubkey) -> Result<()> {
-        ctx.accounts.analyse_user(user_pubkey)
+    pub fn analyze_user(
+        ctx: Context<AnalyzeUser>,
+        user_pubkey: Pubkey,
+        user_data: String,
+    ) -> Result<()> {
+        ctx.accounts.analyse_user(user_pubkey, user_data)
     }
 
     pub fn callback_from_agent(ctx: Context<CallbackFromAgent>, response: String) -> Result<()> {
