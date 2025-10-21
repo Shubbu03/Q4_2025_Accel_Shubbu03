@@ -15,6 +15,8 @@ Q4_2025_Accel_Shubbu03/
 ├── week-02-ers-indexing/             # Ephemeral Rollups & Indexing
 │   ├── magicblock-er/                # MagicBlock ER state management with VRF
 │   └── magicblock-er-ai-agent/       # AI-powered wallet analysis with Solana GPT Oracle
+├── week-03-pinocchio/                 # Pinocchio Framework
+│   └── pinocchio-escrow/              # Low-level escrow program with Pinocchio
 └── README.md
 ```
 
@@ -274,7 +276,71 @@ pub struct AnalysisResult {
 
 ## Week #3: All about Pinocchio
 
-Soon..
+This week focused on Pinocchio framework - a low-level, performance-optimized alternative to Anchor for building Solana programs with minimal overhead and maximum control.
+
+### 1️⃣ Pinocchio Escrow Program
+
+A high-performance token escrow system built with Pinocchio framework, demonstrating low-level Solana program development with manual account management and optimized instruction processing.
+
+**🎯 Core Concepts:**
+- **Pinocchio Framework**: Low-level Solana development framework with minimal overhead
+- **Manual Account Management**: Direct account data manipulation without Anchor abstractions
+- **Instruction Discriminators**: Custom instruction routing using byte discriminators
+- **Memory Layout Control**: Precise control over account data layout and alignment
+
+**Key Features:**
+
+**Instruction Set:**
+- `Make (0)` - Create escrow with token deposit and swap requirements
+- `Take (1)` - Complete atomic token swap between maker and taker
+- `Cancel (2)` - Cancel escrow and return tokens to maker
+- `MakeV2 (3)` - Reserved for future enhanced make instruction
+
+**Escrow State Structure:**
+```rust
+pub struct Escrow {
+    maker: [u8; 32],           // Escrow creator public key
+    mint_a: [u8; 32],         // Token mint being offered
+    mint_b: [u8; 32],         // Token mint being requested
+    amount_to_receive: [u8; 8], // Amount of mint_b to receive
+    amount_to_give: [u8; 8],    // Amount of mint_a to give
+    bump: u8,                  // PDA bump seed
+}
+```
+
+**Architecture Highlights:**
+- **81-byte accounts** (32+32+32+8+8+1) - minimal storage footprint
+- **PDA Security** using `seeds = [b"escrow", maker_pubkey, bump]`
+- **Manual serialization** with `u64::from_le_bytes()` and `to_le_bytes()`
+- **Unsafe memory operations** for direct account data manipulation
+- **Custom instruction routing** via enum discriminators
+
+**Pinocchio vs Anchor Benefits:**
+- **Lower compute costs** - no Anchor framework overhead
+- **Smaller program size** - minimal dependencies
+- **Direct memory control** - unsafe operations for performance
+- **Custom serialization** - manual data layout optimization
+- **Instruction efficiency** - byte-level instruction handling
+
+**Security Features:**
+- **Ownership validation** - all token accounts verified
+- **Mint validation** - token accounts checked against expected mints
+- **PDA verification** - escrow accounts validated using derived addresses
+- **State validation** - escrow state verified before operations
+- **Atomic operations** - all transfers succeed or fail together
+
+**Testing with LiteSVM:**
+- **Fast execution** - lightweight VM for rapid testing
+- **Deterministic results** - consistent test outcomes
+- **Complete instruction flows** - Make, Take, Cancel scenarios
+- **Account state validation** - PDA derivation and token transfers
+- **Compute unit tracking** - performance monitoring
+
+**Tech Stack:** Pinocchio 0.9.2, Pinocchio Token, Pinocchio System, LiteSVM
+
+**Program ID:** `4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT`
+
+[📂 View Project](./week-03-pinocchio/pinocchio-escrow)
 
 ---
 
