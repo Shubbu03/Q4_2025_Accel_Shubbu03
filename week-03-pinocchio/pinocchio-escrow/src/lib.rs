@@ -22,8 +22,15 @@ pub fn process_instruction(
         .ok_or(pinocchio::program_error::ProgramError::InvalidInstructionData)?;
 
     match EscrowInstrctions::try_from(discriminator)? {
-        EscrowInstrctions::Make => instructions::process_make_instruction(accounts, data)?,
-        EscrowInstrctions::Take => instructions::process_take_instruction(accounts, data)?,
+        EscrowInstrctions::Make => {
+            instructions::process_make_instruction(accounts, data)?;
+            instructions::transfer_token(accounts, data)?;
+        }
+        EscrowInstrctions::Take => {
+            instructions::process_take_instruction(accounts, data)?;
+            instructions::maker_transfer(accounts)?;
+            instructions::taker_transfer(accounts)?;
+        }
         EscrowInstrctions::Cancel => instructions::process_cancel_instruction(accounts, data)?,
         // EscrowInstrctions::MakeV2 => instructions::process_make_instruction_v2(accounts, data)?,
         _ => return Err(pinocchio::program_error::ProgramError::InvalidInstructionData),
