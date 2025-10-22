@@ -8,7 +8,7 @@ pub struct Escrow {
     mint_b: [u8; 32],
     amount_to_receive: [u8; 8],
     amount_to_give: [u8; 8],
-    pub bump: u8,
+    pub bump: u8, // better way - [u8;1]
 }
 
 impl Escrow {
@@ -25,7 +25,7 @@ impl Escrow {
         }
 
         // let mut escrow = Escrow::default();
-        
+
         // escrow.maker.copy_from_slice(&data[0..32]);
         // escrow.mint_a.copy_from_slice(&data[32..64]);
         // escrow.mint_b.copy_from_slice(&data[64..96]);
