@@ -12,7 +12,7 @@ pub struct Escrow {
 }
 
 impl Escrow {
-    pub const LEN: usize = 32 + 32 + 32 + 8 + 8;
+    pub const LEN: usize = 32 + 32 + 32 + 8 + 8 + 1;
 
     pub fn from_account_info(account_info: &AccountInfo) -> Result<&mut Self, ProgramError> {
         let mut data = account_info.try_borrow_mut_data()?;
