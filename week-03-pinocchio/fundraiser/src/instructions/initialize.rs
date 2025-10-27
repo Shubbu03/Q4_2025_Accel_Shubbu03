@@ -56,7 +56,7 @@ pub fn initialize(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
 
     let pda_bump_bytes = ix_data.bump;
 
-    Fundraiser::validate_pda(ix_data.bump, fundraiser.key())?;
+    Fundraiser::validate_pda_with_maker(ix_data.bump, fundraiser.key(), maker.key())?;
 
     // signer seeds
     let signer_seeds = [

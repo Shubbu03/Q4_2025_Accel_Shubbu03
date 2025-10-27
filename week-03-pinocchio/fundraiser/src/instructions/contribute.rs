@@ -6,7 +6,6 @@ use pinocchio::{
     sysvars::{clock::Clock, rent::Rent, Sysvar},
     ProgramResult,
 };
-use pinocchio_associated_token_account::instructions::CreateIdempotent;
 use pinocchio_system::instructions::CreateAccount;
 use pinocchio_token::instructions::Transfer;
 
@@ -28,7 +27,7 @@ impl DataLen for ContributeIxData {
 }
 
 pub fn contribute(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
-    let [contributor, mint_to_raise, fundraiser, contributor_account, contributor_ata, vault, sysvar_rent_acc, token_program, system_program] =
+    let [contributor, mint_to_raise, fundraiser, contributor_account, contributor_ata, vault, sysvar_rent_acc, token_program, _system_program] =
         accounts
     else {
         return Err(ProgramError::NotEnoughAccountKeys);
@@ -115,16 +114,22 @@ pub fn contribute(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         unsafe { load_acc_mut::<Contributor>(contributor_account.borrow_mut_data_unchecked())? }
     };
 
-    // creating contributor ATA if it doesn't exist
-    CreateIdempotent {
-        funding_account: contributor,
-        account: contributor_ata,
-        wallet: contributor,
-        mint: mint_to_raise,
-        system_program: system_program,
-        token_program: token_program,
+    // validating contributor ATA PDA
+    let (derived_ata, _bump_seed) = pinocchio::pubkey::find_program_address(
+        &[
+            contributor.key().as_ref(),
+            token_program.key().as_ref(),
+            mint_to_raise.key().as_ref(),
+        ],
+        &pinocchio_associated_token_account::id(),
+    );
+    if derived_ata != *contributor_ata.key() {
+        return Err(ProgramError::InvalidAccountData);
     }
-    .invoke()?;
+    // validating ATA account exists (check if data is non-empty)
+    if contributor_ata.data_is_empty() {
+        return Err(ProgramError::UninitializedAccount);
+    }
 
     // current amount OR (current + new) amount exceeds the limit
     if contributor_account_data.amount > max_contribution
