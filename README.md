@@ -16,7 +16,8 @@ Q4_2025_Accel_Shubbu03/
 │   ├── magicblock-er/                # MagicBlock ER state management with VRF
 │   └── magicblock-er-ai-agent/       # AI-powered wallet analysis with Solana GPT Oracle
 ├── week-03-pinocchio/                 # Pinocchio Framework
-│   └── pinocchio-escrow/              # Low-level escrow program with Pinocchio
+│   ├── pinocchio-escrow/              # Low-level escrow program with Pinocchio
+│   └── fundraiser/                    # Token-based fundraising system with Pinocchio
 └── README.md
 ```
 
@@ -341,6 +342,85 @@ pub struct Escrow {
 **Program ID:** `4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT`
 
 [📂 View Project](./week-03-pinocchio/pinocchio-escrow)
+
+---
+
+### 2️⃣ Pinocchio Fundraiser Program
+
+A no_std fundraising system built with Pinocchio framework, enabling decentralized token-based fundraising with automated contribution limits, time constraints, and refund capabilities.
+
+**🎯 Core Concepts:**
+- **Fundraising Mechanics**: Target-based token collection with duration limits
+- **Contribution Limits**: Maximum 10% per contributor to prevent centralization
+- **Time-based Constraints**: Duration-based expiry with refund mechanisms
+- **Zero-copy Deserialization**: Bytemuck for efficient state management
+- **no_std Environment**: Pure Solana program without standard library
+
+**Key Features:**
+
+**Instruction Set:**
+- `Initialize (0)` - Create fundraiser with target amount and duration
+- `Contribute (1)` - Send tokens to fundraiser with validation
+- `CheckContribution (2)` - Check if target met and withdraw funds
+- `Refund (3)` - Return contributions if target not met after expiry
+
+**Fundraiser State:**
+```rust
+pub struct Fundraiser {
+    pub maker: Pubkey,          // Fundraiser creator
+    pub mint_to_raise: Pubkey,  // Token mint for fundraising
+    pub amount_to_raise: u64,   // Target amount
+    pub current_amount: u64,    // Current amount raised
+    pub time_started: i64,       // Unix timestamp start
+    pub duration: [u8; 1],      // Duration in days
+    pub bump: [u8; 1],          // PDA bump seed
+}
+```
+
+**Contributor State:**
+```rust
+pub struct Contributor {
+    pub amount: u64,  // Total contributed by this user
+}
+```
+
+**Safety Mechanisms:**
+- **Minimum Raise**: 3 tokens minimum to prevent dust attacks
+- **Max Contribution**: 10% of target per contributor (prevents dominance)
+- **Time-based Expiry**: Automatic refund availability after duration
+- **Target Validation**: Cannot withdraw without meeting target
+- **Refund Protection**: Only if target not met and fundraiser ended
+
+**PDA Architecture:**
+- **Fundraiser PDA**: `seeds = [b"fundraiser", maker_pubkey, bump]`
+- **Contributor PDA**: `seeds = [b"contributor", fundraiser_pubkey, contributor_pubkey, bump]`
+- **Vault ATA**: Token account holding all contributions
+
+**Bytemuck Integration:**
+- Zero-copy serialization with `Pod` and `Zeroable` traits
+- Memory layout control with `#[repr(C, packed)]`
+- Efficient state loading without allocation
+
+**Constants:**
+- `MIN_AMOUNT_TO_RAISE`: 3 tokens
+- `SECONDS_TO_DAYS`: 86400 (time conversion)
+- `MAX_CONTRIBUTION_PERCENTAGE`: 10%
+- `PERCENTAGE_SCALER`: 100
+
+**Custom Error Types:**
+- `InvalidAmount` - Below minimum or invalid values
+- `ContributionTooSmall` - Below 1 native unit
+- `ContributionTooBig` - Exceeds 10% of target
+- `FundraiserEnded` - Duration expired
+- `TargetNotMet` - Insufficient funds for withdrawal
+- `TargetMet` - Cannot refund after success
+- `PdaMismatch` - PDA validation failure
+
+**Tech Stack:** Pinocchio 0.9.2, Bytemuck, Pinocchio Token, no_std, LiteSVM
+
+**Program ID:** `9vKWS1DteTPdRFPRzaJgSYwUsNV8VQDcdeiz5WRvavdv`
+
+[📂 View Project](./week-03-pinocchio/fundraiser)
 
 ---
 

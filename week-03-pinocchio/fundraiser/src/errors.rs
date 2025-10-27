@@ -1,14 +1,23 @@
 use pinocchio::program_error::ProgramError;
 
 #[derive(Clone, PartialEq, shank::ShankType)]
-pub enum MyProgramError {
+pub enum FundraiserError {
     InvalidInstructionData,
     PdaMismatch,
     InvalidOwner,
+    InvalidAmount,
+    MintMismatch,
+    ContributionTooSmall,
+    ContributionTooBig,
+    FundraiserEnded,
+    MaximumContributionsReached,
+    TargetNotMet,
+    FundraiserNotEnded,
+    TargetMet,
 }
 
-impl From<MyProgramError> for ProgramError {
-    fn from(e: MyProgramError) -> Self {
+impl From<FundraiserError> for ProgramError {
+    fn from(e: FundraiserError) -> Self {
         Self::Custom(e as u32)
     }
-}       
+}
