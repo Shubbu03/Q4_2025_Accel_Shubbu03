@@ -1,11 +1,12 @@
 use crate::{errors::FundraiserError, states::DataLen};
+use bytemuck::{Pod, Zeroable};
 use pinocchio::{
     program_error::ProgramError,
     pubkey::{self, Pubkey},
 };
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[repr(C, packed)]
+#[derive(Clone, Copy, Debug, PartialEq, Pod, Zeroable)]
 pub struct Contributor {
     pub amount: u64,
 }

@@ -1,3 +1,4 @@
+use bytemuck::{Pod, Zeroable};
 use pinocchio::{
     account_info::AccountInfo,
     instruction::{Seed, Signer},
@@ -14,8 +15,8 @@ use crate::states::{
     Fundraiser,
 };
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[repr(C, packed)]
+#[derive(Clone, Copy, Debug, PartialEq, Pod, Zeroable)]
 pub struct Initialize {
     pub amount: u64,
     pub duration: [u8; 1],
@@ -51,7 +52,7 @@ pub fn initialize(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
 
     let rent = Rent::from_account_info(sysvar_rent_acc)?;
 
-    let ix_data = unsafe { load_ix_data::<Initialize>(data)? };
+    let ix_data = load_ix_data::<Initialize>(data)?;
 
     let pda_bump_bytes = ix_data.bump;
 

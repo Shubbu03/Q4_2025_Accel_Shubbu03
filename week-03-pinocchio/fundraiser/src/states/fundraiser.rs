@@ -1,3 +1,4 @@
+use bytemuck::{Pod, Zeroable};
 use pinocchio::{
     account_info::AccountInfo,
     program_error::ProgramError,
@@ -10,11 +11,11 @@ use crate::{
     constants::MIN_AMOUNT_TO_RAISE,
     errors::FundraiserError,
     instructions::Initialize,
-    states::{load_acc_mut_unchecked, DataLen},
+    states::{load_acc_mut, DataLen},
 };
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[repr(C, packed)]
+#[derive(Clone, Copy, Debug, PartialEq, Pod, Zeroable)]
 pub struct Fundraiser {
     pub maker: Pubkey,
     pub mint_to_raise: Pubkey,
@@ -48,9 +49,8 @@ impl Fundraiser {
         mint_to_raise: &Pubkey,
         mint_decimals: u8,
     ) -> ProgramResult {
-        let fundraiser = unsafe {
-            load_acc_mut_unchecked::<Fundraiser>(my_stata_acc.borrow_mut_data_unchecked())
-        }?;
+        let fundraiser =
+            unsafe { load_acc_mut::<Fundraiser>(my_stata_acc.borrow_mut_data_unchecked())? };
 
         if ix_data.amount < MIN_AMOUNT_TO_RAISE.pow(mint_decimals as u32) {
             return Err(FundraiserError::InvalidAmount.into());

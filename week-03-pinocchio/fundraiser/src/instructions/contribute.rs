@@ -1,3 +1,4 @@
+use bytemuck::{Pod, Zeroable};
 use pinocchio::{
     account_info::AccountInfo,
     instruction::{Seed, Signer},
@@ -12,11 +13,11 @@ use pinocchio_token::instructions::Transfer;
 use crate::{
     constants::{MAX_CONTRIBUTION_PERCENTAGE, PERCENTAGE_SCALER, SECONDS_TO_DAYS},
     errors::FundraiserError,
-    states::{load_acc_mut_unchecked, load_ix_data, Contributor, DataLen, Fundraiser},
+    states::{load_acc_mut, load_ix_data, Contributor, DataLen, Fundraiser},
 };
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[repr(C, packed)]
+#[derive(Clone, Copy, Debug, PartialEq, Pod, Zeroable)]
 pub struct ContributeIxData {
     pub amount: u64,
     pub bump: [u8; 1],
@@ -44,7 +45,7 @@ pub fn contribute(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
 
     // loading fundraiser data
     let fundraiser_data =
-        unsafe { load_acc_mut_unchecked::<Fundraiser>(fundraiser.borrow_mut_data_unchecked()) }?;
+        unsafe { load_acc_mut::<Fundraiser>(fundraiser.borrow_mut_data_unchecked())? };
 
     // validating that mint_to_raise matches fundraiser's mint
     if mint_to_raise.key() != &fundraiser_data.mint_to_raise {
@@ -55,7 +56,7 @@ pub fn contribute(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
     let mint_decimals = mint_data[44];
 
     //load ix data
-    let contributor_ix_data = unsafe { load_ix_data::<ContributeIxData>(data) }?;
+    let contributor_ix_data = load_ix_data::<ContributeIxData>(data)?;
 
     let rent = Rent::from_account_info(sysvar_rent_acc)?;
 
@@ -105,15 +106,13 @@ pub fn contribute(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
 
         // initialize contributor account
         let contributor_data = unsafe {
-            load_acc_mut_unchecked::<Contributor>(contributor_account.borrow_mut_data_unchecked())
-        }?;
+            load_acc_mut::<Contributor>(contributor_account.borrow_mut_data_unchecked())?
+        };
         contributor_data.amount = 0;
         contributor_data
     } else {
         // Load existing contributor account
-        unsafe {
-            load_acc_mut_unchecked::<Contributor>(contributor_account.borrow_mut_data_unchecked())
-        }?
+        unsafe { load_acc_mut::<Contributor>(contributor_account.borrow_mut_data_unchecked())? }
     };
 
     // creating contributor ATA if it doesn't exist

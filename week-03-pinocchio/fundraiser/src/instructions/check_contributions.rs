@@ -1,3 +1,4 @@
+use bytemuck;
 use pinocchio::{
     account_info::AccountInfo,
     instruction::{Seed, Signer},
@@ -9,7 +10,7 @@ use pinocchio_token::instructions::Transfer;
 
 use crate::{
     errors::FundraiserError,
-    states::{load_acc_mut_unchecked, Fundraiser},
+    states::{load_acc_mut, Fundraiser},
 };
 
 pub fn check_contributions(accounts: &[AccountInfo], _data: &[u8]) -> ProgramResult {
@@ -29,7 +30,7 @@ pub fn check_contributions(accounts: &[AccountInfo], _data: &[u8]) -> ProgramRes
 
     // loading fundraiser data
     let fundraiser_data =
-        unsafe { load_acc_mut_unchecked::<Fundraiser>(fundraiser.borrow_mut_data_unchecked()) }?;
+        unsafe { load_acc_mut::<Fundraiser>(fundraiser.borrow_mut_data_unchecked())? };
 
     if mint_to_raise.key() != &fundraiser_data.mint_to_raise {
         return Err(FundraiserError::MintMismatch.into());
@@ -55,16 +56,9 @@ pub fn check_contributions(accounts: &[AccountInfo], _data: &[u8]) -> ProgramRes
     let vault_data = vault.try_borrow_data()?;
 
     // token account amount is at offset 64 (after discriminator + owner + mint + amount)
-    let vault_amount = u64::from_le_bytes([
-        vault_data[64],
-        vault_data[65],
-        vault_data[66],
-        vault_data[67],
-        vault_data[68],
-        vault_data[69],
-        vault_data[70],
-        vault_data[71],
-    ]);
+    let amount_bytes = &vault_data[64..72];
+    let vault_amount = *bytemuck::try_from_bytes::<u64>(amount_bytes)
+        .map_err(|_| ProgramError::InvalidAccountData)?;
 
     // validation logic
     if vault_amount < fundraiser_data.amount_to_raise {

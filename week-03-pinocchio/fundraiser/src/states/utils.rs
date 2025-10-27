@@ -1,3 +1,4 @@
+use bytemuck;
 use pinocchio::program_error::ProgramError;
 
 use crate::errors::FundraiserError;
@@ -6,34 +7,39 @@ pub trait DataLen {
     const LEN: usize;
 }
 
+/// Safely load account data using bytemuck
 #[inline(always)]
-pub unsafe fn load_acc_unchecked<T: DataLen>(bytes: &[u8]) -> Result<&T, ProgramError> {
+pub fn load_acc<T: DataLen + bytemuck::Pod>(bytes: &[u8]) -> Result<&T, ProgramError> {
     if bytes.len() != T::LEN {
         return Err(ProgramError::InvalidAccountData);
     }
-    Ok(&*(bytes.as_ptr() as *const T))
+    bytemuck::try_from_bytes(bytes).map_err(|_| ProgramError::InvalidAccountData)
 }
 
+/// Safely load mutable account data using bytemuck
 #[inline(always)]
-pub unsafe fn load_acc_mut_unchecked<T: DataLen>(bytes: &mut [u8]) -> Result<&mut T, ProgramError> {
+pub fn load_acc_mut<T: DataLen + bytemuck::Pod>(bytes: &mut [u8]) -> Result<&mut T, ProgramError> {
     if bytes.len() != T::LEN {
         return Err(ProgramError::InvalidAccountData);
     }
-    Ok(&mut *(bytes.as_mut_ptr() as *mut T))
+    bytemuck::try_from_bytes_mut(bytes).map_err(|_| ProgramError::InvalidAccountData)
 }
 
+/// Safely load instruction data using bytemuck
 #[inline(always)]
-pub unsafe fn load_ix_data<T: DataLen>(bytes: &[u8]) -> Result<&T, ProgramError> {
+pub fn load_ix_data<T: DataLen + bytemuck::Pod>(bytes: &[u8]) -> Result<&T, ProgramError> {
     if bytes.len() != T::LEN {
         return Err(FundraiserError::InvalidInstructionData.into());
     }
-    Ok(&*(bytes.as_ptr() as *const T))
+    bytemuck::try_from_bytes(bytes).map_err(|_| FundraiserError::InvalidInstructionData.into())
 }
 
-pub unsafe fn to_bytes<T: DataLen>(data: &T) -> &[u8] {
-    core::slice::from_raw_parts(data as *const T as *const u8, T::LEN)
+/// Convert data to bytes safely
+pub fn to_bytes<T: DataLen + bytemuck::Pod>(data: &T) -> &[u8] {
+    bytemuck::bytes_of(data)
 }
 
-pub unsafe fn to_mut_bytes<T: DataLen>(data: &mut T) -> &mut [u8] {
-    core::slice::from_raw_parts_mut(data as *mut T as *mut u8, T::LEN)
+/// Convert mutable data to bytes safely
+pub fn to_mut_bytes<T: DataLen + bytemuck::Pod>(data: &mut T) -> &mut [u8] {
+    bytemuck::bytes_of_mut(data)
 }

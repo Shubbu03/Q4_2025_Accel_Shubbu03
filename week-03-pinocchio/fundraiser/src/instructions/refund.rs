@@ -10,8 +10,9 @@ use pinocchio_token::instructions::Transfer;
 use crate::{
     constants::SECONDS_TO_DAYS,
     errors::FundraiserError,
-    states::{load_acc_mut_unchecked, Contributor, Fundraiser},
+    states::{load_acc_mut, Contributor, Fundraiser},
 };
+use bytemuck;
 
 pub fn refund_to_contributors(accounts: &[AccountInfo], _data: &[u8]) -> ProgramResult {
     let [contributor, maker, mint_to_raise, fundraiser, contributor_account, contributor_ata, vault, _token_program, _system_program] =
@@ -31,7 +32,7 @@ pub fn refund_to_contributors(accounts: &[AccountInfo], _data: &[u8]) -> Program
 
     // loading fundraiser data
     let fundraiser_data =
-        unsafe { load_acc_mut_unchecked::<Fundraiser>(fundraiser.borrow_mut_data_unchecked()) }?;
+        unsafe { load_acc_mut::<Fundraiser>(fundraiser.borrow_mut_data_unchecked())? };
 
     // validating that mint_to_raise matches fundraiser's mint
     if mint_to_raise.key() != &fundraiser_data.mint_to_raise {
@@ -44,9 +45,8 @@ pub fn refund_to_contributors(accounts: &[AccountInfo], _data: &[u8]) -> Program
     }
 
     // loading contributor account data
-    let contributor_account_data = unsafe {
-        load_acc_mut_unchecked::<Contributor>(contributor_account.borrow_mut_data_unchecked())
-    }?;
+    let contributor_account_data =
+        unsafe { load_acc_mut::<Contributor>(contributor_account.borrow_mut_data_unchecked())? };
 
     // fundraising duration has been reached
     let current_time = Clock::get()?.unix_timestamp;
@@ -58,16 +58,9 @@ pub fn refund_to_contributors(accounts: &[AccountInfo], _data: &[u8]) -> Program
 
     // loading token account data to get the amount
     let vault_data = vault.try_borrow_data()?;
-    let vault_amount = u64::from_le_bytes([
-        vault_data[64],
-        vault_data[65],
-        vault_data[66],
-        vault_data[67],
-        vault_data[68],
-        vault_data[69],
-        vault_data[70],
-        vault_data[71],
-    ]);
+    let amount_bytes = &vault_data[64..72];
+    let vault_amount = *bytemuck::try_from_bytes::<u64>(amount_bytes)
+        .map_err(|_| ProgramError::InvalidAccountData)?;
 
     // checking if the target has been met (if so, no refunds allowed)
     if vault_amount >= fundraiser_data.amount_to_raise {
