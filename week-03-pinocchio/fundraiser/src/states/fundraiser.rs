@@ -42,6 +42,19 @@ impl Fundraiser {
         Ok(())
     }
 
+    pub fn validate_pda_with_maker(
+        bump: [u8; 1],
+        pda: &Pubkey,
+        maker: &Pubkey,
+    ) -> Result<(), ProgramError> {
+        let seeds = &[Self::SEED.as_bytes(), maker.as_ref(), &bump];
+        let derived = pubkey::create_program_address(seeds, &crate::ID)?;
+        if derived != *pda {
+            return Err(FundraiserError::PdaMismatch.into());
+        }
+        Ok(())
+    }
+
     pub fn initialize(
         my_stata_acc: &AccountInfo,
         ix_data: &Initialize,
